@@ -92,8 +92,6 @@ pub async fn run_test(path: PathBuf) -> eyre::Result<()> {
             continue
         }
 
-        // if matches!(suite.pre, State(RootOrState::Root(_))) {}
-
         let pre_state = suite.pre.0;
 
         debug!("Executing test: {name} for spec: {:?}", suite.network);
@@ -132,9 +130,9 @@ pub async fn run_test(path: PathBuf) -> eyre::Result<()> {
                 tx.put::<tables::Bytecodes>(code_hash, account.code.to_vec())?;
             }
             account.storage.iter().try_for_each(|(k, v)| {
-                tracing::trace!("Update storage: {address} key:{:?} val:{:?}", k.0, v.0);
                 let mut key = H256::zero();
                 k.0.to_big_endian(&mut key.0);
+                tracing::trace!("Update storage: {address} key:{:?}({key:?}) val:{:?}", k.0, v.0);
                 tx.put::<tables::PlainStorageState>(address, StorageEntry { key, value: v.0 })
             })?;
 
@@ -158,6 +156,19 @@ pub async fn run_test(path: PathBuf) -> eyre::Result<()> {
         })??;
         tracing::trace!("Pre state :{:?}", storage);
 
+        // TODO remove print test
+        let acc = reth_primitives::H160(reth_primitives::hex_literal::hex!(
+            "ec0e71ad0a90ffe1909d27dac207f7680abba42d"
+        ));
+        let prob_val =
+            db.tx().unwrap().cursor_dup::<tables::PlainStorageState>().unwrap().seek_by_key_subkey(
+                acc,
+                H256(reth_primitives::hex_literal::hex!(
+                    "6e369836487c234b9e553ef3f787c2d8865520739d340c67b3d251a33986e58d"
+                )),
+            );
+        debug!("Value wih seek_by_key_subkey {prob_val:?}");
+
         // Initialize the execution stage
         // Hardcode the chain_id to Ethereum 1.
         let mut stage =
@@ -169,21 +180,9 @@ pub async fn run_test(path: PathBuf) -> eyre::Result<()> {
             let mut transaction = Transaction::new(db.as_ref())?;
 
             // ignore error
-            let _ = stage.execute(&mut transaction, input).await;
+            let _ = stage.execute(&mut transaction, input).await?;
             transaction.commit()?;
         }
-
-        // TODO remove print test
-        let acc = reth_primitives::H160(reth_primitives::hex_literal::hex!(
-            "095e7baea6a6c7c4c2dfeb977efac326af552d87"
-        ));
-        let prob_val = db
-            .tx()
-            .unwrap()
-            .cursor_dup::<tables::PlainStorageState>()
-            .unwrap()
-            .seek_by_key_subkey(acc, H256::zero());
-        debug!("Value wih seek_by_key_subkey {prob_val:?}");
 
         // Validate post state
         match suite.post_state {

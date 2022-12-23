@@ -72,6 +72,7 @@ impl AccountInfoChangeSet {
                     tx_index,
                     AccountBeforeTx { address, info: None },
                 )?;
+                tracing::info!("Update {address} to account: {new:?}");
                 tx.put::<tables::PlainAccountState>(address, new)?;
             }
             AccountInfoChangeSet::Destroyed { old } => {
@@ -260,6 +261,8 @@ pub fn execute_and_verify_receipt<DB: StateProvider>(
 ) -> Result<ExecutionResult, Error> {
     let transaction_change_set = execute(header, transactions, config, db)?;
 
+    tracing::trace!("Transaction changesets:{transaction_change_set:?}");
+
     let receipts_iter =
         transaction_change_set.changesets.iter().map(|changeset| &changeset.receipt);
 
@@ -335,13 +338,17 @@ pub fn execute<DB: StateProvider>(
         revm_wrap::fill_tx_env(&mut evm.env.tx, transaction);
 
         // Execute transaction.
-        let out = evm.transact();
+        //let out = evm.transact();
 
-        // let out = evm.inspect(revm::inspectors::CustomPrintTracer::default());
-        // tracing::trace!(target:"evm","Executing transaction {:?}, \n:{out:?}: {:?}
-        // \nENV:{:?}",transaction.hash(),transaction,evm.env);
+        let out = evm.inspect(revm::inspectors::CustomPrintTracer::default());
+        tracing::trace!(target:"evm","Executing transaction {:?}, \n:{out:?}: {:?}
+        \nENV:{:?}",transaction.hash(),transaction,evm.env);
 
-        let (revm::ExecutionResult { exit_reason, gas_used, logs, .. }, state) = out;
+        let (revm::ExecutionResult { exit_reason, gas_used, logs, gas_refunded, .. }, state) = out;
+
+        tracing::debug!(
+            "Exit reason: {exit_reason:?}, gas_used: {gas_used}, gas_refunded:{gas_refunded}"
+        );
 
         // Fatal internal error.
         if exit_reason == revm::Return::FatalExternalError {

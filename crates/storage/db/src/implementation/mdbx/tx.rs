@@ -85,11 +85,14 @@ impl<'tx, K: TransactionKind, E: EnvironmentKind> DbTx<'tx> for Tx<'tx, K, E> {
 
 impl<E: EnvironmentKind> DbTxMut<'_> for Tx<'_, RW, E> {
     fn put<T: Table>(&self, key: T::Key, value: T::Value) -> Result<(), Error> {
+        let key = key.encode();
+        let value = value.compress();
+        println!("PUT KEY:{:x?} VALUE:{:x?}", key.as_ref(), value.as_ref());
         self.inner
             .put(
                 &self.inner.open_db(Some(T::NAME)).map_err(|e| Error::Write(e.into()))?,
-                &key.encode(),
-                &value.compress(),
+                &key,
+                &value,
                 WriteFlags::UPSERT,
             )
             .map_err(|e| Error::Write(e.into()))

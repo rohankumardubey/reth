@@ -58,6 +58,8 @@ impl<DB: StateProvider> DatabaseRef for State<DB> {
         let index = H256(index.to_be_bytes());
         let ret =
             evmU256::from_limbs(self.0.storage(H160(address.0), index)?.unwrap_or_default().0);
+
+        tracing::info!("---->LOAD:{address:?}[{index:?}] = {ret:?}s");
         Ok(ret)
     }
 

@@ -106,12 +106,18 @@ impl<'tx, K: TransactionKind, T: DupSort> DbDupCursorRO<'tx, T> for Cursor<'tx, 
     fn seek_by_key_subkey(
         &mut self,
         key: <T as Table>::Key,
-        value: <T as DupSort>::SubKey,
+        subkey: <T as DupSort>::SubKey,
     ) -> ValueOnlyResult<T> {
+        let key = key.encode();
+        let subkey = subkey.encode();
+        println!("key:{:x?} subkey:{:x?}", key.as_ref(), subkey.as_ref());
         self.inner
-            .get_both_range(key.encode().as_ref(), value.encode().as_ref())
+            .get_both_range(key.as_ref(), subkey.as_ref())
             .map_err(|e| Error::Read(e.into()))?
-            .map(decode_one::<T>)
+            .map(|t| {
+                println!("VALUE: {t:?}");
+                decode_one::<T>(t)
+            })
             .transpose()
     }
 
