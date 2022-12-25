@@ -3635,6 +3635,7 @@ dependencies = [
  "futures",
  "hex",
  "linked_hash_set",
+ "metrics",
  "parking_lot 0.12.1",
  "pin-project",
  "rand 0.8.5",

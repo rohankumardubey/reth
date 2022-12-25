@@ -324,6 +324,14 @@ impl PeersManager {
         reputation_change: ReputationChangeKind,
     ) {
         trace!(target: "net::peers", ?remote_addr, ?peer_id, ?err, "handling failed connection");
+        if let Some(peer) = self.peers.get(peer_id) {
+            let direction = match peer.state {
+                PeerConnectionState::In | PeerConnectionState::DisconnectingIn => "incoming",
+                PeerConnectionState::Out | PeerConnectionState::DisconnectingOut => "outgoing",
+                _ => "unknown",
+            };
+            metrics::counter!("p2p.peers.failed_connections", 1, "direction" => direction);
+        }
 
         if err.is_fatal_protocol_error() {
             trace!(target: "net::peers", ?remote_addr, ?peer_id, ?err, "fatal connection error");
@@ -587,18 +595,22 @@ impl ConnectionInfo {
     }
 
     fn decr_out(&mut self) {
+        metrics::decrement_gauge!("p2p.peers.connections", 1f64, "direction" => "outgoing");
         self.num_outbound -= 1;
     }
 
     fn inc_out(&mut self) {
+        metrics::increment_gauge!("p2p.peers.connections", 1f64, "direction" => "outgoing");
         self.num_outbound += 1;
     }
 
     fn inc_in(&mut self) {
+        metrics::increment_gauge!("p2p.peers.connections", 1f64, "direction" => "incoming");
         self.num_inbound += 1;
     }
 
     fn decr_in(&mut self) {
+        metrics::decrement_gauge!("p2p.peers.connections", 1f64, "direction" => "incoming");
         self.num_inbound -= 1;
     }
 }

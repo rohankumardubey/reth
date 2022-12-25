@@ -545,6 +545,7 @@ where
                         ?total_active,
                         "Session established"
                     );
+                    metrics::counter!("p2p.active_connections", 1, "direction" => if direction.is_incoming() { "incoming" } else { "outgoing" });
 
                     if direction.is_incoming() {
                         this.swarm
