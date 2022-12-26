@@ -32,3 +32,8 @@ members = [
     "crates/metrics/metrics-derive",
 ]
 default-members = ["bin/reth"]
+
+[patch."https://github.com/gakonst/ethers-rs"]
+ethers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
+ethers-core = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
+ethers-providers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
