@@ -142,8 +142,11 @@ impl Command {
                 commit_threshold: config.stages.sender_recovery.commit_threshold,
             })
             .push(ExecutionStage { config: ExecutorConfig::new_ethereum() })
-            .push(AccountHashingStage {})
-            .push(StorageHashingStage {});
+            // Add unwind Intermediate stage that would calculate new stateroot on unwinded hashed from
+            // [`AccountHashingStage`] and [`StorageHashingStage`].
+            .push(AccountHashingStage {batch_size: 500_000})
+            .push(StorageHashingStage {batch_size: 500_500});
+            // Add Intermediate stage for calculating state root
 
         if let Some(tip) = self.tip {
             debug!("Tip manually set: {}", tip);

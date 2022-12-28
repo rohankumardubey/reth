@@ -16,7 +16,10 @@ const ACCOUNT_HASHING: StageId = StageId("AccountHashingStage");
 /// Account hashing stage hashes plain account.
 /// This is preparation before generating intermediate hashes and calculating Merkle tree root.
 #[derive(Debug)]
-pub struct AccountHashingStage {}
+pub struct AccountHashingStage {
+    /// How many account are going to be read at same time.
+    pub batch_size: usize,
+}
 
 #[async_trait::async_trait]
 impl<DB: Database> Stage<DB> for AccountHashingStage {
@@ -37,16 +40,13 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
         tx.clear::<tables::HashedAcccount>()?;
         tx.commit()?;
 
-        // NOTE, this will depend on RAM memory and how many account can be put inside memory.
-        let batch_size = 500_000;
-
         let mut first_key = H160::zero();
         loop {
             let mut accounts = tx.cursor::<tables::PlainAccountState>()?;
 
             let hashed_batch = accounts
                 .walk(first_key)?
-                .take(batch_size)
+                .take(self.batch_size)
                 .map(|res| res.map(|(address, account)| (keccak256(address), account)))
                 .collect::<Result<BTreeMap<_, _>, _>>()?;
 
@@ -59,9 +59,9 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
 
             if let Some((next_key, _)) = next_key {
                 first_key = next_key;
-                continue
+                continue;
             }
-            break
+            break;
         }
 
         info!(target: "sync::stages::hashing_account", "Stage finished");
@@ -82,7 +82,107 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
 
 #[cfg(test)]
 mod tests {
+    use super::AccountHashingStage;
+    use crate::{
+        test_utils::{
+            ExecuteStageTestRunner, StageTestRunner, TestRunnerError, TestTransaction,
+            UnwindStageTestRunner,
+        },
+        ExecInput, ExecOutput, UnwindInput,
+    };
 
     #[test]
     pub fn sanity_test() {}
+
+    pub struct AccountHashingTestRunner {
+        tx: TestTransaction,
+        threshold: u64,
+    }
+
+    impl Default for AccountHashingTestRunner {
+        fn default() -> Self {
+            Self { threshold: 1000, tx: TestTransaction::default() }
+        }
+    }
+
+    impl AccountHashingTestRunner {
+        fn set_threshold(&mut self, threshold: u64) {
+            self.threshold = threshold;
+        }
+    }
+
+    impl StageTestRunner for AccountHashingTestRunner {
+        type S = AccountHashingStage;
+
+        fn tx(&self) -> &TestTransaction {
+            &self.tx
+        }
+
+        fn stage(&self) -> Self::S {
+            AccountHashingStage { batch_size: 10 }
+        }
+    }
+
+    impl ExecuteStageTestRunner for AccountHashingTestRunner {
+        type Seed = Vec<()>;
+
+        fn seed_execution(&mut self, input: ExecInput) -> Result<Self::Seed, TestRunnerError> {
+            // let stage_progress = input.stage_progress.unwrap_or_default();
+            // let end = input.previous_stage_progress() + 1;
+
+            // let blocks = random_block_range(stage_progress..end, H256::zero(), 0..2);
+
+            // let mut current_tx_id = 0;
+            // blocks.iter().try_for_each(|b| -> Result<(), TestRunnerError> {
+            //     current_tx_id = self.insert_block(current_tx_id, b, b.number == stage_progress)?;
+            //     Ok(())
+            // })?;
+            Ok(vec![])
+        }
+
+        fn validate_execution(
+            &self,
+            input: ExecInput,
+            output: Option<ExecOutput>,
+        ) -> Result<(), TestRunnerError> {
+            // if let Some(output) = output {
+            //     self.tx.query(|tx| {
+            //         let start_block = input.stage_progress.unwrap_or_default() + 1;
+            //         let end_block = output.stage_progress;
+
+            //         if start_block > end_block {
+            //             return Ok(());
+            //         }
+
+            //         let start_hash = tx.get::<tables::CanonicalHeaders>(start_block)?.unwrap();
+            //         let mut body_cursor = tx.cursor::<tables::BlockBodies>()?;
+            //         body_cursor.seek_exact((start_block, start_hash).into())?;
+
+            //         while let Some((_, body)) = body_cursor.next()? {
+            //             for tx_id in body.tx_id_range() {
+            //                 let transaction = tx
+            //                     .get::<tables::Transactions>(tx_id)?
+            //                     .expect("no transaction entry");
+            //                 let signer =
+            //                     transaction.recover_signer().expect("failed to recover signer");
+            //                 assert_eq!(Some(signer), tx.get::<tables::TxSenders>(tx_id)?);
+            //             }
+            //         }
+
+            //         Ok(())
+            //     })?;
+            // } else {
+            //     self.check_no_senders_by_block(input.stage_progress.unwrap_or_default())?;
+            // }
+
+            Ok(())
+        }
+    }
+
+    impl UnwindStageTestRunner for AccountHashingTestRunner {
+        fn validate_unwind(&self, input: UnwindInput) -> Result<(), TestRunnerError> {
+            //self.check_no_senders_by_block(input.unwind_to)
+            Ok(())
+        }
+    }
 }

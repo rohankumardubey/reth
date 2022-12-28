@@ -2,7 +2,7 @@ use crate::{
     db::Transaction, ExecInput, ExecOutput, Stage, StageError, StageId, UnwindInput, UnwindOutput,
 };
 use reth_db::{
-    cursor::{DbCursorRO, DbCursorRW, DbDupCursorRO},
+    cursor::{DbCursorRO, DbCursorRW},
     database::Database,
     tables,
     transaction::{DbTx, DbTxMut},
@@ -11,18 +11,21 @@ use reth_primitives::{keccak256, H160};
 use std::{collections::BTreeMap, fmt::Debug};
 use tracing::*;
 
-const ACCOUNT_HASHING: StageId = StageId("StorageHashingStage");
+const STORAGE_HASHING: StageId = StageId("StorageHashingStage");
 
 /// Storage hashing stage hashes plain storage.
 /// This is preparation before generating intermediate hashes and calculating Merkle tree root.
 #[derive(Debug)]
-pub struct StorageHashingStage {}
+pub struct StorageHashingStage {
+    /// How many storage slots are going to be read at same time.
+    pub batch_size: usize,
+}
 
 #[async_trait::async_trait]
 impl<DB: Database> Stage<DB> for StorageHashingStage {
     /// Return the id of the stage
     fn id(&self) -> StageId {
-        ACCOUNT_HASHING
+        STORAGE_HASHING
     }
 
     /// Execute the stage.
@@ -37,16 +40,13 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
         tx.clear::<tables::HashedStorage>()?;
         tx.commit()?;
 
-        // NOTE, this will depend on RAM memory and how many storagas can be put inside memory.
-        let batch_size = 500_000;
-
         let mut first_key = H160::zero();
         loop {
             let mut storage = tx.cursor_dup::<tables::PlainStorageState>()?;
 
             let hashed_batch = storage
                 .walk(first_key)?
-                .take(batch_size)
+                .take(self.batch_size)
                 .map(|res| {
                     res.map(|(address, mut slot)| {
                         // both account address and storage slot key are hashed for merkle tree.
@@ -65,12 +65,12 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 
             if let Some((next_key, _)) = next_key {
                 first_key = next_key;
-                continue
+                continue;
             }
-            break
+            break;
         }
 
-        info!(target: "sync::stages::hashing_account", "Stage finished");
+        info!(target: "sync::stages::hashing_storage", "Stage finished");
         Ok(ExecOutput { stage_progress: input.previous_stage_progress(), done: true })
     }
 
