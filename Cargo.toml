@@ -37,3 +37,4 @@ default-members = ["bin/reth"]
 ethers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
 ethers-core = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
 ethers-providers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
+ethers-signers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
