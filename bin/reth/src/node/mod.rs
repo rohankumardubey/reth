@@ -29,7 +29,8 @@ use reth_provider::{db_provider::ProviderImpl, BlockProvider, HeaderProvider};
 use reth_stages::{
     metrics::HeaderMetrics,
     stages::{
-        bodies::BodyStage, execution::ExecutionStage, headers::HeaderStage,
+        bodies::BodyStage, execution::ExecutionStage, hashing_account::AccountHashingStage,
+        hashing_storage::StorageHashingStage, headers::HeaderStage,
         sender_recovery::SenderRecoveryStage,
     },
 };
@@ -140,7 +141,9 @@ impl Command {
                 batch_size: config.stages.sender_recovery.batch_size,
                 commit_threshold: config.stages.sender_recovery.commit_threshold,
             })
-            .push(ExecutionStage { config: ExecutorConfig::new_ethereum() });
+            .push(ExecutionStage { config: ExecutorConfig::new_ethereum() })
+            .push(AccountHashingStage {})
+            .push(StorageHashingStage {});
 
         if let Some(tip) = self.tip {
             debug!("Tip manually set: {}", tip);

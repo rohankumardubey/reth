@@ -2,6 +2,10 @@
 pub mod bodies;
 /// The execution stage that generates state diff.
 pub mod execution;
+/// Account hashing stage.
+pub mod hashing_account;
+/// Storage hashing stage.
+pub mod hashing_storage;
 /// The headers stage.
 pub mod headers;
 /// The sender recovery stage.
