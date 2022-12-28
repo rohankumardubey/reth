@@ -65,9 +65,9 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 
             if let Some((next_key, _)) = next_key {
                 first_key = next_key;
-                continue;
+                continue
             }
-            break;
+            break
         }
 
         info!(target: "sync::stages::hashing_storage", "Stage finished");

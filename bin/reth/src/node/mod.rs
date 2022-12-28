@@ -144,9 +144,9 @@ impl Command {
             .push(ExecutionStage { config: ExecutorConfig::new_ethereum() })
             // Add unwind Intermediate stage that would calculate new stateroot on unwinded hashed from
             // [`AccountHashingStage`] and [`StorageHashingStage`].
-            .push(AccountHashingStage {batch_size: 500_000})
-            .push(StorageHashingStage {batch_size: 500_500});
-            // Add Intermediate stage for calculating state root
+            .push(AccountHashingStage { batch_size: 500_000 })
+            .push(StorageHashingStage { batch_size: 500_500 });
+        // Add Intermediate stage for calculating state root
 
         if let Some(tip) = self.tip {
             debug!("Tip manually set: {}", tip);
@@ -184,7 +184,7 @@ fn init_genesis<DB: Database>(db: Arc<DB>, genesis: Genesis) -> Result<H256, ret
     let tx = db.tx_mut()?;
     if let Some((_, hash)) = tx.cursor::<tables::CanonicalHeaders>()?.first()? {
         debug!("Genesis already written, skipping.");
-        return Ok(hash)
+        return Ok(hash);
     }
     debug!("Writing genesis block.");
 
@@ -206,7 +206,7 @@ fn init_genesis<DB: Database>(db: Arc<DB>, genesis: Genesis) -> Result<H256, ret
     tx.put::<tables::CanonicalHeaders>(0, hash)?;
     tx.put::<tables::HeaderNumbers>(hash, 0)?;
     tx.put::<tables::BlockBodies>((0, hash).into(), Default::default())?;
-    tx.put::<tables::BlockTransitionIndex>((0, hash).into(), 0)?;
+    tx.put::<tables::BlockTransitionIndex>(0, 0)?;
     tx.put::<tables::HeaderTD>((0, hash).into(), header.difficulty.into())?;
     tx.put::<tables::Headers>((0, hash).into(), header)?;
 

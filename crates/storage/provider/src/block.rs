@@ -145,11 +145,8 @@ pub fn insert_canonical_block<'a, TX: DbTxMut<'a> + DbTx<'a>>(
                     block_hash: prev_block_hash,
                 })?;
             let last_transition_id = tx
-                .get::<tables::BlockTransitionIndex>((prev_block_num, prev_block_hash).into())?
-                .ok_or(ProviderError::BlockTransition {
-                    block_number: prev_block_num,
-                    block_hash: prev_block_hash,
-                })?;
+                .get::<tables::BlockTransitionIndex>(prev_block_num)?
+                .ok_or(ProviderError::BlockTransition { block_number: prev_block_num })?;
             (prev_body.start_tx_id + prev_body.tx_count, last_transition_id + 1)
         }
     };
@@ -172,7 +169,7 @@ pub fn insert_canonical_block<'a, TX: DbTxMut<'a> + DbTx<'a>>(
     if has_block_reward {
         transition_id += 1;
     }
-    tx.put::<tables::BlockTransitionIndex>((block.number, block.hash()).into(), transition_id)?;
+    tx.put::<tables::BlockTransitionIndex>(block.number, transition_id)?;
 
     Ok(())
 }

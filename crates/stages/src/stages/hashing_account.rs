@@ -34,34 +34,51 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
         tx: &mut Transaction<'_, DB>,
         input: ExecInput,
     ) -> Result<ExecOutput, StageError> {
-        // TODO introduce threshold for decision if we do hashing of all accounts vs
-        // reading changesets and hashing only part of accounts.
+        // Number of blocks
+        let threshold = 100_000;
 
-        tx.clear::<tables::HashedAcccount>()?;
-        tx.commit()?;
+        let stage_progress = input.stage_progress.unwrap_or_default();
+        let previous_stage_progress = input.previous_stage_progress();
 
-        let mut first_key = H160::zero();
-        loop {
-            let mut accounts = tx.cursor::<tables::PlainAccountState>()?;
+        if previous_stage_progress - stage_progress > threshold {
+            // clear table, load all accounts and hash it
+            tx.clear::<tables::HashedAcccount>()?;
+            tx.commit()?;
 
-            let hashed_batch = accounts
-                .walk(first_key)?
-                .take(self.batch_size)
-                .map(|res| res.map(|(address, account)| (keccak256(address), account)))
-                .collect::<Result<BTreeMap<_, _>, _>>()?;
+            let mut first_key = H160::zero();
+            loop {
+                let mut accounts = tx.cursor::<tables::PlainAccountState>()?;
 
-            // next key of iterator
-            let next_key = accounts.next()?;
+                let hashed_batch = accounts
+                    .walk(first_key)?
+                    .take(self.batch_size)
+                    .map(|res| res.map(|(address, account)| (keccak256(address), account)))
+                    .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-            let mut hashes = tx.cursor_mut::<tables::HashedAcccount>()?;
-            // iterate and append presorted hashed accounts
-            hashed_batch.into_iter().map(|(k, v)| hashes.append(k, v)).collect::<Result<_, _>>()?;
+                // next key of iterator
+                let next_key = accounts.next()?;
 
-            if let Some((next_key, _)) = next_key {
-                first_key = next_key;
-                continue;
+                let mut hashes = tx.cursor_mut::<tables::HashedAcccount>()?;
+                // iterate and append presorted hashed accounts
+                hashed_batch
+                    .into_iter()
+                    .map(|(k, v)| hashes.append(k, v))
+                    .collect::<Result<_, _>>()?;
+
+                if let Some((next_key, _)) = next_key {
+                    first_key = next_key;
+                    continue
+                }
+                break
             }
-            break;
+        } else {
+            // read account changeset, merge it into one changeset and calculate account hashes.
+            let block_transaction_index = tx.cursor::<tables::BlockTransitionIndex>()?;
+            let account_changeset = tx.cursor::<tables::AccountChangeSet>()?;
+
+            //let block_inxes =
+            // block_transaction_index.walk(stage_progress)?.take(previous_stage_progress -
+            // stage_progress as usize).collect()?;
         }
 
         info!(target: "sync::stages::hashing_account", "Stage finished");
