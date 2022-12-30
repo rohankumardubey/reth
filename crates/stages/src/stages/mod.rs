@@ -8,5 +8,7 @@ pub mod hashing_account;
 pub mod hashing_storage;
 /// The headers stage.
 pub mod headers;
+/// Intermediate hashes and creating merkle root
+pub mod merkle;
 /// The sender recovery stage.
 pub mod sender_recovery;

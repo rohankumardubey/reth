@@ -30,7 +30,7 @@ use reth_stages::{
     metrics::HeaderMetrics,
     stages::{
         bodies::BodyStage, execution::ExecutionStage, hashing_account::AccountHashingStage,
-        hashing_storage::StorageHashingStage, headers::HeaderStage,
+        hashing_storage::StorageHashingStage, headers::HeaderStage, merkle::MerkleStage,
         sender_recovery::SenderRecoveryStage,
     },
 };
@@ -142,11 +142,12 @@ impl Command {
                 commit_threshold: config.stages.sender_recovery.commit_threshold,
             })
             .push(ExecutionStage { config: ExecutorConfig::new_ethereum() })
-            // Add unwind Intermediate stage that would calculate new stateroot on unwinded hashed from
-            // [`AccountHashingStage`] and [`StorageHashingStage`].
+            // This Merkle stage is used only on unwind
+            .push(MerkleStage { is_execute: false })
             .push(AccountHashingStage { batch_size: 500_000 })
-            .push(StorageHashingStage { batch_size: 500_500 });
-        // Add Intermediate stage for calculating state root
+            .push(StorageHashingStage { batch_size: 500_000 })
+            // This merkle stage is used only for execute
+            .push(MerkleStage { is_execute: true });
 
         if let Some(tip) = self.tip {
             debug!("Tip manually set: {}", tip);
@@ -184,7 +185,7 @@ fn init_genesis<DB: Database>(db: Arc<DB>, genesis: Genesis) -> Result<H256, ret
     let tx = db.tx_mut()?;
     if let Some((_, hash)) = tx.cursor::<tables::CanonicalHeaders>()?.first()? {
         debug!("Genesis already written, skipping.");
-        return Ok(hash);
+        return Ok(hash)
     }
     debug!("Writing genesis block.");
 

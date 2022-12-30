@@ -33,7 +33,7 @@ pub enum TableType {
 }
 
 /// Default tables that should be present inside database.
-pub const TABLES: [(TableType, &str); 23] = [
+pub const TABLES: [(TableType, &str); 25] = [
     (TableType::Table, CanonicalHeaders::const_name()),
     (TableType::Table, HeaderTD::const_name()),
     (TableType::Table, HeaderNumbers::const_name()),
@@ -54,6 +54,8 @@ pub const TABLES: [(TableType, &str); 23] = [
     (TableType::Table, StorageHistory::const_name()),
     (TableType::DupSort, AccountChangeSet::const_name()),
     (TableType::DupSort, StorageChangeSet::const_name()),
+    (TableType::Table, HashedAcccount::const_name()),
+    (TableType::DupSort, HashedStorage::const_name()),
     (TableType::Table, TxSenders::const_name()),
     (TableType::Table, Config::const_name()),
     (TableType::Table, SyncStage::const_name()),
@@ -171,6 +173,10 @@ table!(
 
 table!(
     /// Stores the mapping of block number to state transition id.
+    /// The block transition marks the final state at the end of the block.
+    /// Increment the transition if the block contains an addition block reward.
+    /// If the block does not have a reward and transaction, the transition will be the same as the
+    /// transition at the last transaction of this block.
     ( BlockTransitionIndex ) BlockNumber | TransitionId
 );
 

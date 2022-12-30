@@ -1,5 +1,6 @@
 use crate::{
-    db::Transaction, ExecInput, ExecOutput, Stage, StageError, StageId, UnwindInput, UnwindOutput,
+    db::Transaction, DatabaseIntegrityError, ExecInput, ExecOutput, Stage, StageError, StageId,
+    UnwindInput, UnwindOutput,
 };
 use reth_db::{
     cursor::{DbCursorRO, DbCursorRW},
@@ -7,8 +8,11 @@ use reth_db::{
     tables,
     transaction::{DbTx, DbTxMut},
 };
-use reth_primitives::{keccak256, H160};
-use std::{collections::BTreeMap, fmt::Debug};
+use reth_primitives::{keccak256, Account, Address, H160};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+};
 use tracing::*;
 
 const ACCOUNT_HASHING: StageId = StageId("AccountHashingStage");
@@ -40,6 +44,9 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
         let stage_progress = input.stage_progress.unwrap_or_default();
         let previous_stage_progress = input.previous_stage_progress();
 
+        // if there are more blocks then threshold it is faster to go over Plain state and hash all
+        // account otherwise take changesets aggregate the sets and apply hashing to
+        // AccountHashing table
         if previous_stage_progress - stage_progress > threshold {
             // clear table, load all accounts and hash it
             tx.clear::<tables::HashedAcccount>()?;
@@ -73,12 +80,42 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
             }
         } else {
             // read account changeset, merge it into one changeset and calculate account hashes.
-            let block_transaction_index = tx.cursor::<tables::BlockTransitionIndex>()?;
-            let account_changeset = tx.cursor::<tables::AccountChangeSet>()?;
+            let from_transition =
+                if stage_progress == 0 { 0 } else { tx.get_block_transition(stage_progress - 1)? };
+            let to_transition = tx.get_block_transition(previous_stage_progress)?;
 
-            //let block_inxes =
-            // block_transaction_index.walk(stage_progress)?.take(previous_stage_progress -
-            // stage_progress as usize).collect()?;
+            // Aggregate all transition changesets and and make list of account that have been
+            // changed.
+            tx.cursor::<tables::AccountChangeSet>()?
+                .walk(from_transition)?
+                .take_while(|res| {
+                    res.as_ref().map(|(k, _)| *k <= to_transition).unwrap_or_default()
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                // fold all account to one set of changed accounts
+                .fold(BTreeSet::new(), |mut accounts: BTreeSet<Address>, (_, account_before)| {
+                    accounts.insert(account_before.address);
+                    accounts
+                })
+                .into_iter()
+                // iterate over plain state and get newest value.
+                // Assumption we are okay to make is that plainstate represent
+                // `previous_stage_progress` state.
+                .map(|address| tx.get::<tables::PlainAccountState>(address).map(|a| (address, a)))
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                // Hash the values and apply them to HashedState (if Account is None remove it);
+                .map(|(address, account)| {
+                    let hashed_address = keccak256(address);
+                    if let Some(account) = account {
+                        tx.put::<tables::HashedAcccount>(hashed_address, account)
+                    } else {
+                        tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
+                    }
+                })
+                // return error
+                .collect::<Result<_, _>>()?;
         }
 
         info!(target: "sync::stages::hashing_account", "Stage finished");
@@ -88,10 +125,49 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
     /// Unwind the stage.
     async fn unwind(
         &mut self,
-        _tx: &mut Transaction<'_, DB>,
+        tx: &mut Transaction<'_, DB>,
         input: UnwindInput,
     ) -> Result<UnwindOutput, Box<dyn std::error::Error + Send + Sync>> {
-        // TODO read AccountChangeSet, set old values and add/delete removed/created accounts.
+        // There is no threshold on account unwind, we will always take changesets and
+        // apply past values to HashedAccount table.
+
+        let from_transition_rev =
+            if input.unwind_to == 0 { 0 } else { tx.get_block_transition(input.unwind_to - 1)? };
+        let to_transition_rev = tx.get_block_transition(input.stage_progress)?;
+
+        // Aggregate all transition changesets and and make list of account that have been changed.
+        tx.cursor::<tables::AccountChangeSet>()?
+            .walk(from_transition_rev)?
+            .take_while(|res| {
+                res.as_ref().map(|(k, _)| *k <= to_transition_rev).unwrap_or_default()
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .into_iter()
+            .rev()
+            // fold all account to get the old balance/nonces and account that needs to be removed
+            .fold(
+                BTreeMap::new(),
+                |mut accounts: BTreeMap<Address, Option<Account>>, (_, account_before)| {
+                    accounts.insert(account_before.address, account_before.info);
+                    accounts
+                },
+            )
+            .into_iter()
+            // hash addresses and collect it inside sorted BTreeMap.
+            // We are doing keccak only once per address.
+            .map(|(address, account)| (keccak256(address), account))
+            .collect::<BTreeMap<_, _>>()
+            .into_iter()
+            // Apply values to HashedState (if Account is None remove it);
+            .map(|(hashed_address, account)| {
+                if let Some(account) = account {
+                    tx.put::<tables::HashedAcccount>(hashed_address, account)
+                } else {
+                    tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
+                }
+            })
+            // return error
+            .collect::<Result<_, _>>()?;
 
         Ok(UnwindOutput { stage_progress: input.unwind_to })
     }
@@ -99,6 +175,8 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
 
 #[cfg(test)]
 mod tests {
+    use reth_primitives::{Account, Address};
+
     use super::AccountHashingStage;
     use crate::{
         test_utils::{
@@ -141,9 +219,11 @@ mod tests {
     }
 
     impl ExecuteStageTestRunner for AccountHashingTestRunner {
-        type Seed = Vec<()>;
+        type Seed = Vec<(Address, Account)>;
 
         fn seed_execution(&mut self, input: ExecInput) -> Result<Self::Seed, TestRunnerError> {
+            // Seed plain state and changesets. changesets can be randomized.
+
             // let stage_progress = input.stage_progress.unwrap_or_default();
             // let end = input.previous_stage_progress() + 1;
 
@@ -162,6 +242,8 @@ mod tests {
             input: ExecInput,
             output: Option<ExecOutput>,
         ) -> Result<(), TestRunnerError> {
+            // validate execution if state
+
             // if let Some(output) = output {
             //     self.tx.query(|tx| {
             //         let start_block = input.stage_progress.unwrap_or_default() + 1;
