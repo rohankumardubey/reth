@@ -1,6 +1,5 @@
 use crate::{
-    db::Transaction, DatabaseIntegrityError, ExecInput, ExecOutput, Stage, StageError, StageId,
-    UnwindInput, UnwindOutput,
+    db::Transaction, ExecInput, ExecOutput, Stage, StageError, StageId, UnwindInput, UnwindOutput,
 };
 use reth_db::{
     cursor::{DbCursorRO, DbCursorRW},
@@ -175,6 +174,12 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn sanity_test() {}
+
+    /*
+
     use reth_primitives::{Account, Address};
 
     use super::AccountHashingStage;
@@ -185,9 +190,6 @@ mod tests {
         },
         ExecInput, ExecOutput, UnwindInput,
     };
-
-    #[test]
-    pub fn sanity_test() {}
 
     pub struct AccountHashingTestRunner {
         tx: TestTransaction,
@@ -222,18 +224,6 @@ mod tests {
         type Seed = Vec<(Address, Account)>;
 
         fn seed_execution(&mut self, input: ExecInput) -> Result<Self::Seed, TestRunnerError> {
-            // Seed plain state and changesets. changesets can be randomized.
-
-            // let stage_progress = input.stage_progress.unwrap_or_default();
-            // let end = input.previous_stage_progress() + 1;
-
-            // let blocks = random_block_range(stage_progress..end, H256::zero(), 0..2);
-
-            // let mut current_tx_id = 0;
-            // blocks.iter().try_for_each(|b| -> Result<(), TestRunnerError> {
-            //     current_tx_id = self.insert_block(current_tx_id, b, b.number == stage_progress)?;
-            //     Ok(())
-            // })?;
             Ok(vec![])
         }
 
@@ -242,37 +232,6 @@ mod tests {
             input: ExecInput,
             output: Option<ExecOutput>,
         ) -> Result<(), TestRunnerError> {
-            // validate execution if state
-
-            // if let Some(output) = output {
-            //     self.tx.query(|tx| {
-            //         let start_block = input.stage_progress.unwrap_or_default() + 1;
-            //         let end_block = output.stage_progress;
-
-            //         if start_block > end_block {
-            //             return Ok(());
-            //         }
-
-            //         let start_hash = tx.get::<tables::CanonicalHeaders>(start_block)?.unwrap();
-            //         let mut body_cursor = tx.cursor::<tables::BlockBodies>()?;
-            //         body_cursor.seek_exact((start_block, start_hash).into())?;
-
-            //         while let Some((_, body)) = body_cursor.next()? {
-            //             for tx_id in body.tx_id_range() {
-            //                 let transaction = tx
-            //                     .get::<tables::Transactions>(tx_id)?
-            //                     .expect("no transaction entry");
-            //                 let signer =
-            //                     transaction.recover_signer().expect("failed to recover signer");
-            //                 assert_eq!(Some(signer), tx.get::<tables::TxSenders>(tx_id)?);
-            //             }
-            //         }
-
-            //         Ok(())
-            //     })?;
-            // } else {
-            //     self.check_no_senders_by_block(input.stage_progress.unwrap_or_default())?;
-            // }
 
             Ok(())
         }
@@ -284,4 +243,5 @@ mod tests {
             Ok(())
         }
     }
+    */
 }

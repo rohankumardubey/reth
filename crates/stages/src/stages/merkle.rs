@@ -41,6 +41,8 @@ impl<DB: Database> Stage<DB> for MerkleStage {
             return Ok(ExecOutput { stage_progress: input.previous_stage_progress(), done: true })
         }
 
+        // Iterate over changeset (similar to Hashing stages) and take new values
+
         info!(target: "sync::stages::merkle::exec", "Stage finished");
         Ok(ExecOutput { stage_progress: input.previous_stage_progress(), done: true })
     }

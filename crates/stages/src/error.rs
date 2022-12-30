@@ -1,6 +1,6 @@
 use crate::pipeline::PipelineEvent;
 use reth_interfaces::{consensus, db::Error as DbError, executor};
-use reth_primitives::{BlockHash, BlockNumber, TxNumber, H256};
+use reth_primitives::{BlockNumber, TxNumber, H256};
 use thiserror::Error;
 use tokio::sync::mpsc::error::SendError;
 

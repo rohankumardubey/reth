@@ -9,10 +9,7 @@ use reth_db::{
     transaction::{DbTx, DbTxMut},
 };
 use reth_primitives::{keccak256, Address, StorageEntry, H160, H256, U256};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    fmt::Debug,
-};
+use std::{collections::BTreeMap, fmt::Debug};
 use tracing::*;
 
 const STORAGE_HASHING: StageId = StageId("StorageHashingStage");
@@ -79,19 +76,19 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 
                 if let Some((next_key, _)) = next_key {
                     first_key = next_key;
-                    continue;
+                    continue
                 }
-                break;
+                break
             }
         } else {
-            // read account changeset, merge it into one changeset and calculate account hashes.
+            // read storage changeset, merge it into one changeset and calculate storage hashes.
             let from_transition =
                 if stage_progress == 0 { 0 } else { tx.get_block_transition(stage_progress - 1)? };
             let to_transition = tx.get_block_transition(previous_stage_progress)?;
 
-            let plain_storage = tx.cursor_dup::<tables::PlainStorageState>()?;
+            let mut plain_storage = tx.cursor_dup::<tables::PlainStorageState>()?;
 
-            // Aggregate all transition changesets and and make list of account that have been
+            // Aggregate all transition changesets and and make list of storages that have been
             // changed.
             tx.cursor::<tables::StorageChangeSet>()?
                 .walk((from_transition, H160::zero()).into())?
@@ -100,7 +97,8 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
-                // fold all storages and save its old state so we can remove it from HashedStorage if needed as it is dup table.
+                // fold all storages and save its old state so we can remove it from HashedStorage
+                // it is needed as it is dup table.
                 .fold(
                     BTreeMap::new(),
                     |mut accounts: BTreeMap<Address, BTreeMap<H256, U256>>,
@@ -114,33 +112,40 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
                 )
                 .into_iter()
                 // iterate over plain state and get newest storage value.
-                // Assumption we are okay to make is that plainstate represent
+                // Assumption we are okay with is that plain state represent
                 // `previous_stage_progress` state.
                 .map(|(address, storage)| {
-                    (
-                        address,
-                        storage
-                            .into_iter()
-                            .map(|(key, val)| {
-                                (
-                                    address,
-                                    key,
-                                    (val, plain_storage.seek_by_key_subkey(address, key)),
-                                )
-                            })
-                            .collect::<Result<_, _>>(),
-                    )
+                    storage
+                        .into_iter()
+                        .map(|(key, val)| {
+                            plain_storage
+                                .seek_by_key_subkey(address, key)
+                                .map(|ret| (key, (val, ret.map(|e| e.value))))
+                        })
+                        .collect::<Result<BTreeMap<_, _>, _>>()
+                        .map(|storage| (address, storage))
                 })
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
-                // Hash the values and apply them to HashedState (if Account is None remove it);
-                .map(|(address, account)| {
+                // Hash the address and key and apply them to HashedStorage (if Storage is None
+                // just remove it);
+                .map(|(address, storage)| {
                     let hashed_address = keccak256(address);
-                    if let Some(account) = account {
-                        tx.put::<tables::HashedAcccount>(hashed_address, account)
-                    } else {
-                        tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
-                    }
+                    storage
+                        .into_iter()
+                        .map(|(key, (old_val, new_val))| -> Result<(), StageError> {
+                            let key = keccak256(key);
+                            tx.delete::<tables::HashedStorage>(
+                                hashed_address,
+                                Some(StorageEntry { key, value: old_val }),
+                            )?;
+                            if let Some(value) = new_val {
+                                let val = StorageEntry { key, value };
+                                tx.put::<tables::HashedStorage>(hashed_address, val)?
+                            }
+                            Ok(())
+                        })
+                        .collect::<Result<_, _>>()
                 })
                 // return error
                 .collect::<Result<_, _>>()?;
@@ -166,5 +171,5 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 mod tests {
 
     #[test]
-    pub fn sanity_test() {}
+    fn sanity_test() {}
 }
