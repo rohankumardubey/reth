@@ -2,13 +2,17 @@ use crate::{
     db::Transaction, ExecInput, ExecOutput, Stage, StageError, StageId, UnwindInput, UnwindOutput,
 };
 use reth_db::{
-    cursor::{DbCursorRO, DbCursorRW},
+    cursor::{DbCursorRO, DbCursorRW, DbDupCursorRO},
     database::Database,
+    models::TransitionIdAddress,
     tables,
     transaction::{DbTx, DbTxMut},
 };
-use reth_primitives::{keccak256, H160};
-use std::{collections::BTreeMap, fmt::Debug};
+use reth_primitives::{keccak256, Address, StorageEntry, H160, H256, U256};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    fmt::Debug,
+};
 use tracing::*;
 
 const STORAGE_HASHING: StageId = StageId("StorageHashingStage");
@@ -34,40 +38,112 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
         tx: &mut Transaction<'_, DB>,
         input: ExecInput,
     ) -> Result<ExecOutput, StageError> {
-        // TODO introduce threshold for decision if we do hashing of all accounts vs
-        // reading changesets and hashing only part of accounts.
+        // Number of blocks
+        let threshold = 100_000;
 
-        tx.clear::<tables::HashedStorage>()?;
-        tx.commit()?;
+        let stage_progress = input.stage_progress.unwrap_or_default();
+        let previous_stage_progress = input.previous_stage_progress();
 
-        let mut first_key = H160::zero();
-        loop {
-            let mut storage = tx.cursor_dup::<tables::PlainStorageState>()?;
+        // if there are more blocks then threshold it is faster to go over Plain state and hash all
+        // account otherwise take changesets aggregate the sets and apply hashing to
+        // AccountHashing table
+        if previous_stage_progress - stage_progress > threshold {
+            tx.clear::<tables::HashedStorage>()?;
+            tx.commit()?;
 
-            let hashed_batch = storage
-                .walk(first_key)?
-                .take(self.batch_size)
-                .map(|res| {
-                    res.map(|(address, mut slot)| {
-                        // both account address and storage slot key are hashed for merkle tree.
-                        slot.key = keccak256(slot.key);
-                        (keccak256(address), slot)
+            let mut first_key = H160::zero();
+            loop {
+                let mut storage = tx.cursor_dup::<tables::PlainStorageState>()?;
+
+                let hashed_batch = storage
+                    .walk(first_key)?
+                    .take(self.batch_size)
+                    .map(|res| {
+                        res.map(|(address, mut slot)| {
+                            // both account address and storage slot key are hashed for merkle tree.
+                            slot.key = keccak256(slot.key);
+                            (keccak256(address), slot)
+                        })
                     })
-                })
-                .collect::<Result<BTreeMap<_, _>, _>>()?;
+                    .collect::<Result<BTreeMap<_, _>, _>>()?;
 
-            // next key of iterator
-            let next_key = storage.next()?;
+                // next key of iterator
+                let next_key = storage.next()?;
 
-            let mut hashes = tx.cursor_mut::<tables::HashedStorage>()?;
-            // iterate and append presorted hashed slots
-            hashed_batch.into_iter().map(|(k, v)| hashes.append(k, v)).collect::<Result<_, _>>()?;
+                let mut hashes = tx.cursor_mut::<tables::HashedStorage>()?;
+                // iterate and append presorted hashed slots
+                hashed_batch
+                    .into_iter()
+                    .map(|(k, v)| hashes.append(k, v))
+                    .collect::<Result<_, _>>()?;
 
-            if let Some((next_key, _)) = next_key {
-                first_key = next_key;
-                continue
+                if let Some((next_key, _)) = next_key {
+                    first_key = next_key;
+                    continue;
+                }
+                break;
             }
-            break
+        } else {
+            // read account changeset, merge it into one changeset and calculate account hashes.
+            let from_transition =
+                if stage_progress == 0 { 0 } else { tx.get_block_transition(stage_progress - 1)? };
+            let to_transition = tx.get_block_transition(previous_stage_progress)?;
+
+            let plain_storage = tx.cursor_dup::<tables::PlainStorageState>()?;
+
+            // Aggregate all transition changesets and and make list of account that have been
+            // changed.
+            tx.cursor::<tables::StorageChangeSet>()?
+                .walk((from_transition, H160::zero()).into())?
+                .take_while(|res| {
+                    res.as_ref().map(|(k, _)| k.0 .0 <= to_transition).unwrap_or_default()
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                // fold all storages and save its old state so we can remove it from HashedStorage if needed as it is dup table.
+                .fold(
+                    BTreeMap::new(),
+                    |mut accounts: BTreeMap<Address, BTreeMap<H256, U256>>,
+                     (TransitionIdAddress((_, address)), storage_entry)| {
+                        accounts
+                            .entry(address)
+                            .or_default()
+                            .insert(storage_entry.key, storage_entry.value);
+                        accounts
+                    },
+                )
+                .into_iter()
+                // iterate over plain state and get newest storage value.
+                // Assumption we are okay to make is that plainstate represent
+                // `previous_stage_progress` state.
+                .map(|(address, storage)| {
+                    (
+                        address,
+                        storage
+                            .into_iter()
+                            .map(|(key, val)| {
+                                (
+                                    address,
+                                    key,
+                                    (val, plain_storage.seek_by_key_subkey(address, key)),
+                                )
+                            })
+                            .collect::<Result<_, _>>(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
+                // Hash the values and apply them to HashedState (if Account is None remove it);
+                .map(|(address, account)| {
+                    let hashed_address = keccak256(address);
+                    if let Some(account) = account {
+                        tx.put::<tables::HashedAcccount>(hashed_address, account)
+                    } else {
+                        tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
+                    }
+                })
+                // return error
+                .collect::<Result<_, _>>()?;
         }
 
         info!(target: "sync::stages::hashing_storage", "Stage finished");
