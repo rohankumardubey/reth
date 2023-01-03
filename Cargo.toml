@@ -34,7 +34,7 @@ members = [
 default-members = ["bin/reth"]
 
 [patch."https://github.com/gakonst/ethers-rs"]
-ethers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
-ethers-core = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
-ethers-providers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
-ethers-signers = { git = "https://github.com/rjected/ethers-rs", branch = "expose-clique-config" }
+ethers = { git = "https://github.com/rjected/ethers-rs", branch = "add-log-dump" }
+ethers-core = { git = "https://github.com/rjected/ethers-rs", branch = "add-log-dump" }
+ethers-providers = { git = "https://github.com/rjected/ethers-rs", branch = "add-log-dump" }
+ethers-signers = { git = "https://github.com/rjected/ethers-rs", branch = "add-log-dump" }
