@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
+source = "git+https://github.com/gakonst/ethers-rs#c0e607da1ea7cba3583cf2a19f29975d1c961753"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -1632,7 +1632,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
+source = "git+https://github.com/gakonst/ethers-rs#c0e607da1ea7cba3583cf2a19f29975d1c961753"
 dependencies = [
  "async-trait",
  "auto_impl 1.0.1",
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
+source = "git+https://github.com/gakonst/ethers-rs#c0e607da1ea7cba3583cf2a19f29975d1c961753"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -6213,8 +6213,3 @@ dependencies = [
  "syn",
  "synstructure",
 ]
-
-[[patch.unused]]
-name = "ethers"
-version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
