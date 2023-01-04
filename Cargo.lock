@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#926c144a4ff27b52b0f8f5501b190331118bb2b9"
+source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -1632,7 +1632,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#926c144a4ff27b52b0f8f5501b190331118bb2b9"
+source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
 dependencies = [
  "async-trait",
  "auto_impl 1.0.1",
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#926c144a4ff27b52b0f8f5501b190331118bb2b9"
+source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -6217,4 +6217,4 @@ dependencies = [
 [[patch.unused]]
 name = "ethers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#926c144a4ff27b52b0f8f5501b190331118bb2b9"
+source = "git+https://github.com/rjected/ethers-rs?branch=personal-miner-changes#0bf7fb5f1cee18f54a014fa43e9a39ab23f9b67f"
