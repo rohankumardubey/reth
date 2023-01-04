@@ -1562,7 +1562,7 @@ dependencies = [
 [[package]]
 name = "ethers-core"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#e40727b09d279609b131697e5cd72fc5e2b8a564"
+source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#1233f5665773e1298dc3513bde3daa9d28e36ea3"
 dependencies = [
  "arrayvec",
  "bytes",
@@ -1632,7 +1632,7 @@ dependencies = [
 [[package]]
 name = "ethers-providers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#e40727b09d279609b131697e5cd72fc5e2b8a564"
+source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#1233f5665773e1298dc3513bde3daa9d28e36ea3"
 dependencies = [
  "async-trait",
  "auto_impl 1.0.1",
@@ -1667,7 +1667,7 @@ dependencies = [
 [[package]]
 name = "ethers-signers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#e40727b09d279609b131697e5cd72fc5e2b8a564"
+source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#1233f5665773e1298dc3513bde3daa9d28e36ea3"
 dependencies = [
  "async-trait",
  "coins-bip32",
@@ -6217,4 +6217,4 @@ dependencies = [
 [[patch.unused]]
 name = "ethers"
 version = "1.0.2"
-source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#e40727b09d279609b131697e5cd72fc5e2b8a564"
+source = "git+https://github.com/rjected/ethers-rs?branch=add-log-dump#1233f5665773e1298dc3513bde3daa9d28e36ea3"
