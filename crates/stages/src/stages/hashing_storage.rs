@@ -69,10 +69,7 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 
                 let mut hashes = tx.cursor_mut::<tables::HashedStorage>()?;
                 // iterate and append presorted hashed slots
-                hashed_batch
-                    .into_iter()
-                    .map(|(k, v)| hashes.append(k, v))
-                    .collect::<Result<_, _>>()?;
+                hashed_batch.into_iter().try_for_each(|(k, v)| hashes.append(k, v))?;
 
                 if let Some((next_key, _)) = next_key {
                     first_key = next_key;
@@ -129,11 +126,10 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
                 .into_iter()
                 // Hash the address and key and apply them to HashedStorage (if Storage is None
                 // just remove it);
-                .map(|(address, storage)| {
+                .try_for_each(|(address, storage)| {
                     let hashed_address = keccak256(address);
-                    storage
-                        .into_iter()
-                        .map(|(key, (old_val, new_val))| -> Result<(), StageError> {
+                    storage.into_iter().try_for_each(
+                        |(key, (old_val, new_val))| -> Result<(), StageError> {
                             let key = keccak256(key);
                             tx.delete::<tables::HashedStorage>(
                                 hashed_address,
@@ -144,11 +140,9 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
                                 tx.put::<tables::HashedStorage>(hashed_address, val)?
                             }
                             Ok(())
-                        })
-                        .collect::<Result<_, _>>()
-                })
-                // return error
-                .collect::<Result<_, _>>()?;
+                        },
+                    )
+                })?;
         }
 
         info!(target: "sync::stages::hashing_storage", "Stage finished");

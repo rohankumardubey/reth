@@ -66,10 +66,7 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
 
                 let mut hashes = tx.cursor_mut::<tables::HashedAcccount>()?;
                 // iterate and append presorted hashed accounts
-                hashed_batch
-                    .into_iter()
-                    .map(|(k, v)| hashes.append(k, v))
-                    .collect::<Result<_, _>>()?;
+                hashed_batch.into_iter().try_for_each(|(k, v)| hashes.append(k, v))?;
 
                 if let Some((next_key, _)) = next_key {
                     first_key = next_key;
@@ -104,17 +101,14 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
                 .map(|address| tx.get::<tables::PlainAccountState>(address).map(|a| (address, a)))
                 .collect::<Result<Vec<_>, _>>()?
                 .into_iter()
-                // Hash the values and apply them to HashedState (if Account is None remove it);
-                .map(|(address, account)| {
+                .try_for_each(|(address, account)| {
                     let hashed_address = keccak256(address);
                     if let Some(account) = account {
                         tx.put::<tables::HashedAcccount>(hashed_address, account)
                     } else {
                         tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
                     }
-                })
-                // return error
-                .collect::<Result<_, _>>()?;
+                })?;
         }
 
         info!(target: "sync::stages::hashing_account", "Stage finished");
@@ -158,15 +152,13 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
             .collect::<BTreeMap<_, _>>()
             .into_iter()
             // Apply values to HashedState (if Account is None remove it);
-            .map(|(hashed_address, account)| {
+            .try_for_each(|(hashed_address, account)| {
                 if let Some(account) = account {
                     tx.put::<tables::HashedAcccount>(hashed_address, account)
                 } else {
                     tx.delete::<tables::HashedAcccount>(hashed_address, None).map(|_| ())
                 }
-            })
-            // return error
-            .collect::<Result<_, _>>()?;
+            })?;
 
         Ok(UnwindOutput { stage_progress: input.unwind_to })
     }
