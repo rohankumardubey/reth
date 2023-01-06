@@ -126,7 +126,7 @@ impl<DB: Database> Stage<DB> for AccountHashingStage {
         &mut self,
         tx: &mut Transaction<'_, DB>,
         input: UnwindInput,
-    ) -> Result<UnwindOutput, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<UnwindOutput, StageError> {
         // There is no threshold on account unwind, we will always take changesets and
         // apply past values to HashedAccount table.
 

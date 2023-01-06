@@ -5,7 +5,7 @@ use crate::{
     identifier::{SenderId, TransactionId},
     traits::{PoolTransaction, TransactionOrigin},
 };
-use reth_primitives::{rpc::Address, TxHash, U256};
+use reth_primitives::{Address, TxHash, U256};
 use std::{fmt, time::Instant};
 
 /// A Result type returned after checking a transaction's validity.
@@ -27,7 +27,7 @@ pub enum TransactionValidationOutcome<T: PoolTransaction> {
 
 /// Provides support for validating transaction at any given state of the chain
 #[async_trait::async_trait]
-pub trait TransactionValidator: Send + Sync + 'static {
+pub trait TransactionValidator: Send + Sync {
     /// The transaction type to validate.
     type Transaction: PoolTransaction;
 

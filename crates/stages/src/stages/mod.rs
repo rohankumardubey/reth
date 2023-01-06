@@ -12,3 +12,5 @@ pub mod headers;
 pub mod merkle;
 /// The sender recovery stage.
 pub mod sender_recovery;
+/// The total difficulty stage
+pub mod total_difficulty;

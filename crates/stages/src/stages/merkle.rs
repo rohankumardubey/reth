@@ -52,7 +52,7 @@ impl<DB: Database> Stage<DB> for MerkleStage {
         &mut self,
         _tx: &mut Transaction<'_, DB>,
         input: UnwindInput,
-    ) -> Result<UnwindOutput, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<UnwindOutput, StageError> {
         if self.is_execute {
             info!(target: "sync::stages::merkle::exec", "Stage is always skipped");
             return Ok(UnwindOutput { stage_progress: input.unwind_to })

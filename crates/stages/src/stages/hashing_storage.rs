@@ -160,7 +160,7 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
         &mut self,
         _tx: &mut Transaction<'_, DB>,
         input: UnwindInput,
-    ) -> Result<UnwindOutput, Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<UnwindOutput, StageError> {
         // TODO read StorageChangeSet, set old values and add/delete removed/created storage slots.
 
         Ok(UnwindOutput { stage_progress: input.unwind_to })
