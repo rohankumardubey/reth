@@ -73,9 +73,9 @@ impl<DB: Database> Stage<DB> for StorageHashingStage {
 
                 if let Some((next_key, _)) = next_key {
                     first_key = next_key;
-                    continue;
+                    continue
                 }
-                break;
+                break
             }
         } else {
             // read storage changeset, merge it into one changeset and calculate storage hashes.

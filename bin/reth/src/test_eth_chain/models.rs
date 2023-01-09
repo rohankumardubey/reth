@@ -187,7 +187,7 @@ pub enum ForkSpec {
     Constantinople, // SKIPPED
     /// Constantinople fix
     ConstantinopleFix,
-    /// Instanbul
+    /// Istanbul
     Istanbul,
     /// Berlin
     Berlin,
@@ -208,6 +208,9 @@ pub enum ForkSpec {
     /// After Merge plus new PUSH0 opcode
     #[serde(alias = "Merge+3855")]
     MergePush0,
+    /// Fork Spec which is unknown to us
+    #[serde(other)]
+    Unknown,
 }
 
 impl From<ForkSpec> for reth_executor::SpecUpgrades {
@@ -236,7 +239,10 @@ impl From<ForkSpec> for reth_executor::SpecUpgrades {
                 panic!("Not supported")
             }
             ForkSpec::ByzantiumToConstantinopleAt5 | ForkSpec::Constantinople => {
-                panic!("Overriden with PETERSBURG")
+                panic!("Overridden with PETERSBURG")
+            }
+            ForkSpec::Unknown => {
+                panic!("Unknown fork");
             }
         }
     }
@@ -473,6 +479,6 @@ mod test {
         ]"#;
 
         let res = serde_json::from_str::<Vec<Transaction>>(test);
-        assert!(res.is_ok(), "Failed to deserialize transactin with error: {res:?}");
+        assert!(res.is_ok(), "Failed to deserialize transaction with error: {res:?}");
     }
 }
